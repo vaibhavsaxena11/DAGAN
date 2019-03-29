@@ -49,18 +49,28 @@ def main_train():
     val_data_path = config.TRAIN.val_data_path
     testing_data_path = config.TRAIN.testing_data_path
 
-    with open(training_data_path, 'rb') as f:
-        X_train = pickle.load(f)
+    with open(training_target_data_path, 'rb') as f:
+        X_train_target = pickle.load(f)
+    with open(training_blurry_data_path, 'rb') as f:
+        X_train_blurry = pickle.load(f)
 
-    with open(val_data_path, 'rb') as f:
-        X_val = pickle.load(f)
+    with open(val_target_data_path, 'rb') as f:
+        X_val_target = pickle.load(f)
+    with open(val_blurry_data_path, 'rb') as f:
+        X_val_blurry = pickle.load(f)
 
-    with open(testing_data_path, 'rb') as f:
-        X_test = pickle.load(f)
+    with open(testing_target_data_path, 'rb') as f:
+        X_test_target = pickle.load(f)
+    with open(testing_blurry_data_path, 'rb') as f:
+        X_test_blurry = pickle.load(f)
 
-    print('X_train shape/min/max: ', X_train.shape, X_train.min(), X_train.max())
-    print('X_val shape/min/max: ', X_val.shape, X_val.min(), X_val.max())
-    print('X_test shape/min/max: ', X_test.shape, X_test.min(), X_test.max())
+    print('X_train_target shape/min/max: ', X_train_target.shape, X_train_target.min(), X_train_target.max())
+    print('X_train_blurry shape/min/max: ', X_train_blurry.shape, X_train_blurry.min(), X_train_blurry.max())
+    print('X_val_target shape/min/max: ', X_val_target.shape, X_val_target.min(), X_val_target.max())
+    print('X_val_blurry shape/min/max: ', X_val_blurry.shape, X_val_blurry.min(), X_val_blurry.max())
+    print('X_test_target shape/min/max: ', X_test_target.shape, X_test_target.min(), X_test_target.max())
+    print('X_test_blurry shape/min/max: ', X_test_blurry.shape, X_test_blurry.min(), X_test_blurry.max())
+
 
     print('[*] loading mask ... ')
     if mask_name == "gaussian2d":
@@ -85,7 +95,7 @@ def main_train():
 
     print('[*] define model ... ')
 
-    nw, nh, nz = X_train.shape[1:]
+    nw, nh, nz = X_train_target.shape[1:]
 
     # define placeholders
     t_image_good = tf.placeholder('float32', [batch_size, nw, nh, nz], name='good_image')
@@ -193,13 +203,14 @@ def main_train():
     sess.run(assign_op)
     net_vgg_conv4_good.print_params(False)
 
-    n_training_examples = len(X_train)
+    n_training_examples = len(X_train_target)
     n_step_epoch = round(n_training_examples / batch_size)
 
     # sample testing images
-    idex = tl.utils.get_random_int(min=0, max=len(X_test) - 1, number=sample_size, seed=config.TRAIN.seed)
-    X_samples_good = X_test[idex]
-    X_samples_bad = threading_data(X_samples_good, fn=to_bad_img, mask=mask)
+    idex = tl.utils.get_random_int(min=0, max=len(X_test_target) - 1, number=sample_size, seed=config.TRAIN.seed)
+    X_samples_good = X_test_target[idex]
+    # X_samples_bad = threading_data(X_samples_good, fn=to_bad_img, mask=mask)
+    X_samples_bad = X_test_blurry[idex]
 
     x_good_sample_rescaled = (X_samples_good + 1) / 2
     x_bad_sample_rescaled = (X_samples_bad + 1) / 2
@@ -251,10 +262,15 @@ def main_train():
         for step in range(n_step_epoch):
             step_time = time.time()
             idex = tl.utils.get_random_int(min=0, max=n_training_examples - 1, number=batch_size)
-            X_good = X_train[idex]
+            # X_good = X_train[idex]
+            # X_good_aug = threading_data(X_good, fn=distort_img)
+            # X_good_244 = threading_data(X_good_aug, fn=vgg_prepro)
+            # X_bad = threading_data(X_good_aug, fn=to_bad_img, mask=mask)
+
+            X_good = X_train_target[idex]
             X_good_aug = threading_data(X_good, fn=distort_img)
             X_good_244 = threading_data(X_good_aug, fn=vgg_prepro)
-            X_bad = threading_data(X_good_aug, fn=to_bad_img, mask=mask)
+            X_bad = X_train_blurry[idex]
 
             errD, _ = sess.run([d_loss, d_optim], {t_image_good: X_good_aug, t_image_bad: X_bad})
             errG, errG_perceptual, errG_nmse, errG_fft, _ = sess.run([g_loss, g_perceptual, g_nmse, g_fft, g_optim],
@@ -276,18 +292,22 @@ def main_train():
             print(log)
             log_all.debug(log)
 
+
+        ################################## evaluation (part of training loop) ###############################
+
         # evaluation for training data
         total_nmse_training = 0
         total_ssim_training = 0
         total_psnr_training = 0
         num_training_temp = 0
-        for batch in tl.iterate.minibatches(inputs=X_train, targets=X_train, batch_size=batch_size, shuffle=False):
-            x_good, _ = batch
-            # x_bad = threading_data(x_good, fn=to_bad_img, mask=mask)
-            x_bad = threading_data(
-                x_good,
-                fn=to_bad_img,
-                mask=mask)
+        for batch in tl.iterate.minibatches(inputs=X_train_blurry, targets=X_train_target, batch_size=batch_size, shuffle=False):
+            # x_good, _ = batch
+            # # x_bad = threading_data(x_good, fn=to_bad_img, mask=mask)
+            # x_bad = threading_data(
+            #     x_good,
+            #     fn=to_bad_img,
+            #     mask=mask)
+            x_bad, x_good = batch
 
             x_gen = sess.run(net_test.outputs, {t_image_bad: x_bad})
 
@@ -320,13 +340,14 @@ def main_train():
         total_ssim_val = 0
         total_psnr_val = 0
         num_val_temp = 0
-        for batch in tl.iterate.minibatches(inputs=X_val, targets=X_val, batch_size=batch_size, shuffle=False):
-            x_good, _ = batch
-            # x_bad = threading_data(x_good, fn=to_bad_img, mask=mask)
-            x_bad = threading_data(
-                x_good,
-                fn=to_bad_img,
-                mask=mask)
+        for batch in tl.iterate.minibatches(inputs=X_val_blurry, targets=X_val_target, batch_size=batch_size, shuffle=False):
+            # x_good, _ = batch
+            # # x_bad = threading_data(x_good, fn=to_bad_img, mask=mask)
+            # x_bad = threading_data(
+            #     x_good,
+            #     fn=to_bad_img,
+            #     mask=mask)
+            x_bad, x_good = batch
 
             x_gen = sess.run(net_test.outputs, {t_image_bad: x_bad})
 
