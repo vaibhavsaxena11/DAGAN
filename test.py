@@ -30,12 +30,16 @@ def main_test():
     # ==================================== PREPARE DATA ==================================== #
 
     print('[*] load data ... ')
-    testing_data_path = config.TRAIN.testing_data_path
+    testing_target_data_path = config.TRAIN.testing_target_data_path 
+    testing_blurry_data_path = config.TRAIN.testing_blurry_data_path
 
-    with open(testing_data_path, 'rb') as f:
-        X_test = pickle.load(f)
+    with open(testing_target_data_path, 'rb') as f:
+        X_test_target = pickle.load(f)
+    with open(testing_blurry_data_path, 'rb') as f:
+        X_test_blurry = pickle.load(f)
 
-    print('X_test shape/min/max: ', X_test.shape, X_test.min(), X_test.max())
+    print('X_test_target shape/min/max: ', X_test_target.shape, X_test_target.min(), X_test_target.max())
+    print('X_test_blurry shape/min/max: ', X_test_blurry.shape, X_test_blurry.min(), X_test_blurry.max())
 
     print('[*] loading mask ... ')
     if mask_name == "gaussian2d":
@@ -60,7 +64,7 @@ def main_test():
 
     print('[*] define model ... ')
 
-    nw, nh, nz = X_test.shape[1:]
+    nw, nh, nz = X_test_target.shape[1:]
 
     # define placeholders
     t_image_good = tf.placeholder('float32', [sample_size, nw, nh, nz], name='good_image')     
@@ -87,10 +91,11 @@ def main_test():
                                  name=os.path.join(checkpoint_dir, tl.global_flag['model']) + '.npz',
                                  network=net_test)
 
-    idex = tl.utils.get_random_int(min=0, max=len(X_test) - 1, number=sample_size, seed=config.TRAIN.seed)
-    X_samples_good = X_test[idex]
-    X_samples_bad = threading_data(X_samples_good, fn=to_bad_img, mask=mask)
-
+    idex = tl.utils.get_random_int(min=0, max=len(X_test_target) - 1, number=sample_size, seed=config.TRAIN.seed)
+    X_samples_good = X_test_target[idex]
+    # X_samples_bad = threading_data(X_samples_good, fn=to_bad_img, mask=mask)
+    X_samples_bad = X_test_blurry[idex]
+    
     x_good_sample_rescaled = (X_samples_good + 1) / 2
     x_bad_sample_rescaled = (X_samples_bad + 1) / 2
 
@@ -136,20 +141,20 @@ def main_test():
         psnr_res)
 
     log_inference.debug(log)
-
+    print(log)
     log = "NMSE testing average: {}\nSSIM testing average: {}\nPSNR testing average: {}\n\n".format(
         np.mean(nmse_res),
         np.mean(ssim_res),
         np.mean(psnr_res))
 
     log_inference.debug(log)
-
+    print(log)
     log = "NMSE testing std: {}\nSSIM testing std: {}\nPSNR testing std: {}\n\n".format(np.std(nmse_res),
                                                                                         np.std(ssim_res),
                                                                                         np.std(psnr_res))
 
     log_inference.debug(log)
-
+    print(log)
     # evaluation for zero-filled (ZF) data
     nmse_res_zf = sess.run(nmse_0_1,
                            {t_gen: x_bad_sample_rescaled, t_image_good: x_good_sample_rescaled})
@@ -162,12 +167,12 @@ def main_test():
         psnr_res_zf)
 
     log_inference.debug(log)
-
+    print(log)
     log = "NMSE ZF average testing: {}\nSSIM ZF average testing: {}\nPSNR ZF average testing: {}\n\n".format(
         np.mean(nmse_res_zf),
         np.mean(ssim_res_zf),
         np.mean(psnr_res_zf))
-
+    print(log)
     log_inference.debug(log)
 
     log = "NMSE ZF std testing: {}\nSSIM ZF std testing: {}\nPSNR ZF std testing: {}\n\n".format(
@@ -176,7 +181,7 @@ def main_test():
         np.std(psnr_res_zf))
 
     log_inference.debug(log)
-
+    print(log)
     # sample testing images
     tl.visualize.save_images(x_gen,
                              [5, 10],

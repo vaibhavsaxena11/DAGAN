@@ -1,6 +1,8 @@
 from tensorlayer.layers import *
+import tensorlayer as tl
+import tensorflow as tf
 from utils import *
-
+import os
 
 def discriminator(input_images, is_train=True, reuse=False):
     w_init = tf.random_normal_initializer(stddev=0.02)
@@ -119,46 +121,46 @@ def u_net_bn(x, is_train=False, reuse=False, is_refine=False):
         conv8 = Conv2d(conv7, 512, (4, 4), (2, 2), act=lambda x: tl.act.lrelu(x, 0.2),
                        padding='SAME', W_init=w_init, b_init=b_init, name='conv8')
 
-        up7 = DeConv2d(conv8, 512, (4, 4), out_size=(2, 2), strides=(2, 2), padding='SAME',
+        up7 = DeConv2d(conv8, 512, (4, 4), out_size=(3, 3), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv7')
         up7 = BatchNormLayer(up7, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn7')
 
         up6 = ConcatLayer([up7, conv7], concat_dim=3, name='concat6')
-        up6 = DeConv2d(up6, 1024, (4, 4), out_size=(4, 4), strides=(2, 2), padding='SAME',
+        up6 = DeConv2d(up6, 1024, (4, 4), out_size=(5, 5), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv6')
         up6 = BatchNormLayer(up6, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn6')
 
         up5 = ConcatLayer([up6, conv6], concat_dim=3, name='concat5')
-        up5 = DeConv2d(up5, 1024, (4, 4), out_size=(8, 8), strides=(2, 2), padding='SAME',
+        up5 = DeConv2d(up5, 1024, (4, 4), out_size=(10, 10), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv5')
         up5 = BatchNormLayer(up5, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn5')
 
         up4 = ConcatLayer([up5, conv5], concat_dim=3, name='concat4')
-        up4 = DeConv2d(up4, 1024, (4, 4), out_size=(16, 16), strides=(2, 2), padding='SAME',
+        up4 = DeConv2d(up4, 1024, (4, 4), out_size=(20, 20), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv4')
         up4 = BatchNormLayer(up4, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn4')
 
         up3 = ConcatLayer([up4, conv4], concat_dim=3, name='concat3')
-        up3 = DeConv2d(up3, 256, (4, 4), out_size=(32, 32), strides=(2, 2), padding='SAME',
+        up3 = DeConv2d(up3, 256, (4, 4), out_size=(40, 40), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv3')
         up3 = BatchNormLayer(up3, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn3')
 
         up2 = ConcatLayer([up3, conv3], concat_dim=3, name='concat2')
-        up2 = DeConv2d(up2, 128, (4, 4), out_size=(64, 64), strides=(2, 2), padding='SAME',
+        up2 = DeConv2d(up2, 128, (4, 4), out_size=(80, 80), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv2')
         up2 = BatchNormLayer(up2, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn2')
 
         up1 = ConcatLayer([up2, conv2], concat_dim=3, name='concat1')
-        up1 = DeConv2d(up1, 64, (4, 4), out_size=(128, 128), strides=(2, 2), padding='SAME',
+        up1 = DeConv2d(up1, 64, (4, 4), out_size=(160, 160), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv1')
         up1 = BatchNormLayer(up1, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn1')
 
         up0 = ConcatLayer([up1, conv1], concat_dim=3, name='concat0')
-        up0 = DeConv2d(up0, 64, (4, 4), out_size=(256, 256), strides=(2, 2), padding='SAME',
+        up0 = DeConv2d(up0, 64, (4, 4), out_size=(320, 320), strides=(2, 2), padding='SAME',
                        act=None, W_init=w_init, b_init=b_init, name='deconv0')
         up0 = BatchNormLayer(up0, act=tf.nn.relu, is_train=is_train, gamma_init=gamma_init, name='dbn0')
 
-        if is_refine:
+        if is_refine:	
             out = Conv2d(up0, 1, (1, 1), act=tf.nn.tanh, name='out')
             out = ElementwiseLayer([out, inputs], tf.add, 'add_for_refine')
             out.outputs = tl.act.ramp(out.outputs, v_min=-1, v_max=1)

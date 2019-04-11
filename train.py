@@ -1,9 +1,11 @@
 import pickle
+import tensorlayer as tl
+import tensorflow as tf
 from model import *
 from utils import *
 from config import config, log_config
 from scipy.io import loadmat, savemat
-
+import os
 
 def main_train():
     mask_perc = tl.global_flag['maskperc']
@@ -45,9 +47,16 @@ def main_train():
     # ==================================== PREPARE DATA ==================================== #
 
     print('[*] load data ... ')
-    training_data_path = config.TRAIN.training_data_path
-    val_data_path = config.TRAIN.val_data_path
-    testing_data_path = config.TRAIN.testing_data_path
+    # training_data_path = config.TRAIN.training_data_path
+    # val_data_path = config.TRAIN.val_data_path
+    # testing_data_path = config.TRAIN.testing_data_path
+
+    training_target_data_path = config.TRAIN.training_target_data_path
+    training_blurry_data_path = config.TRAIN.training_blurry_data_path
+    val_target_data_path = config.TRAIN.val_target_data_path 
+    val_blurry_data_path = config.TRAIN.val_blurry_data_path 
+    testing_target_data_path = config.TRAIN.testing_target_data_path 
+    testing_blurry_data_path = config.TRAIN.testing_blurry_data_path
 
     with open(training_target_data_path, 'rb') as f:
         X_train_target = pickle.load(f)
@@ -98,6 +107,7 @@ def main_train():
     nw, nh, nz = X_train_target.shape[1:]
 
     # define placeholders
+    print("Model - define placeholders")
     t_image_good = tf.placeholder('float32', [batch_size, nw, nh, nz], name='good_image')
     t_image_good_samples = tf.placeholder('float32', [sample_size, nw, nh, nz], name='good_image_samples')
     t_image_bad = tf.placeholder('float32', [batch_size, nw, nh, nz], name='bad_image')
@@ -107,6 +117,7 @@ def main_train():
     t_image_good_244 = tf.placeholder('float32', [batch_size, 244, 244, 3], name='vgg_good_image')
 
     # define generator network
+    print("Model - define generator network")
     if tl.global_flag['model'] == 'unet':
         net = u_net_bn(t_image_bad, is_train=True, reuse=False, is_refine=False)
         net_test = u_net_bn(t_image_bad, is_train=False, reuse=True, is_refine=False)
@@ -120,10 +131,12 @@ def main_train():
         raise Exception("unknown model")
 
     # define discriminator network
+    print("Model - define discriminator network")
     net_d, logits_fake = discriminator(net.outputs, is_train=True, reuse=False)
     _, logits_real = discriminator(t_image_good, is_train=True, reuse=True)
 
     # define VGG network
+    print("Model - define VGG network")
     net_vgg_conv4_good, _ = vgg16_cnn_emb(t_image_good_244, reuse=False)
     net_vgg_conv4_gen, _ = vgg16_cnn_emb(tf.tile(tf.image.resize_images(net.outputs, [244, 244]), [1, 1, 1, 3]), reuse=True)
 
@@ -268,11 +281,13 @@ def main_train():
             # X_bad = threading_data(X_good_aug, fn=to_bad_img, mask=mask)
 
             X_good = X_train_target[idex]
-            X_good_aug = threading_data(X_good, fn=distort_img)
+            X_good_aug = X_good
             X_good_244 = threading_data(X_good_aug, fn=vgg_prepro)
             X_bad = X_train_blurry[idex]
 
             errD, _ = sess.run([d_loss, d_optim], {t_image_good: X_good_aug, t_image_bad: X_bad})
+#            errD = sess.run([d_loss], {t_image_good: X_good_aug, t_image_bad: X_bad})
+#            errD = errD[0]
             errG, errG_perceptual, errG_nmse, errG_fft, _ = sess.run([g_loss, g_perceptual, g_nmse, g_fft, g_optim],
                                                                      {t_image_good_244: X_good_244,
                                                                       t_image_good: X_good_aug,

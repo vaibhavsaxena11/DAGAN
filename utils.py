@@ -1,3 +1,4 @@
+import os
 from tensorlayer.prepro import *
 import numpy as np
 import skimage.measure
@@ -13,7 +14,7 @@ def distort_img(x):
     x = rotation(x, rg=10, is_random=True, fill_mode='constant')
     x = shift(x, wrg=0.10, hrg=0.10, is_random=True, fill_mode='constant')
     x = zoom(x, zoom_range=[0.90, 1.10], is_random=True, fill_mode='constant')
-    x = brightness(x, gamma=0.05, is_random=True)
+#    x = brightness(x, gamma=0.05, is_random=True)
     x = x * 2 - 1
     return x
 
